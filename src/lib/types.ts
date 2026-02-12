@@ -14,6 +14,7 @@ export interface Barn {
   id: string
   name: string
   description: string | null
+  join_code: string | null
   created_by: string | null
   created_at: string
   updated_at: string

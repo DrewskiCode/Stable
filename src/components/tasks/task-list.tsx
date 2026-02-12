@@ -107,7 +107,7 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
       fullDescription = `🔄 Repeats ${newTask.repeat}${fullDescription ? '\n' + fullDescription : ''}`
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('tasks')
       .insert({
         barn_id: barnId,
@@ -119,8 +119,11 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
         status: 'todo',
         created_by: user.id,
       })
+      .select()
+      .single()
 
-    if (!error) {
+    if (!error && data) {
+      setTasks(prev => [...prev, data])
       resetForm()
       setShowNewTask(false)
     }

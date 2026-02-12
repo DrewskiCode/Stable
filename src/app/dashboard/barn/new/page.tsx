@@ -25,11 +25,15 @@ export default function NewBarnPage() {
       return
     }
 
+    // Generate a random 6-character join code
+    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+
     const { data, error } = await supabase
       .from('barns')
       .insert({
         name,
         description: description || null,
+        join_code: joinCode,
         created_by: user.id,
       })
       .select()

@@ -3,15 +3,15 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { Barn, BarnMember, Profile, BarnInvite } from '@/lib/types'
-import { Settings, Users, Mail, Trash2, LogOut, Crown, UserCog, User, Eye, Copy, Check } from 'lucide-react'
+import type { Barn, BarnMember, Profile } from '@/lib/types'
+import { Settings, Users, Share2, Trash2, LogOut, Crown, UserCog, User, Eye, Copy, Check, RefreshCw } from 'lucide-react'
 
 export default function SettingsPage({ params }: { params: { barnId: string } }) {
   const [barn, setBarn] = useState<Barn | null>(null)
   const [members, setMembers] = useState<(BarnMember & { profile?: Profile })[]>([])
-  const [invites, setInvites] = useState<BarnInvite[]>([])
   const [currentUserRole, setCurrentUserRole] = useState<string>('member')
   const [loading, setLoading] = useState(true)
+  const [copiedCode, setCopiedCode] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -19,12 +19,6 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
   const [barnName, setBarnName] = useState('')
   const [barnDescription, setBarnDescription] = useState('')
   const [saving, setSaving] = useState(false)
-
-  // Invite form
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'member' | 'manager' | 'viewer'>('member')
-  const [inviting, setInviting] = useState(false)
-  const [copiedInvite, setCopiedInvite] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -59,15 +53,6 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
       if (currentMember) setCurrentUserRole(currentMember.role)
     }
 
-    // Load pending invites
-    const { data: invitesData } = await supabase
-      .from('barn_invites')
-      .select('*')
-      .eq('barn_id', params.barnId)
-      .is('accepted_at', null)
-
-    if (invitesData) setInvites(invitesData)
-
     setLoading(false)
   }
 
@@ -87,38 +72,24 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
     if (!error) loadData()
   }
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) return
-    setInviting(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { error } = await supabase
-      .from('barn_invites')
-      .insert({
-        barn_id: params.barnId,
-        email: inviteEmail.toLowerCase(),
-        role: inviteRole,
-        invited_by: user?.id,
-      })
-
-    setInviting(false)
-    if (!error) {
-      setInviteEmail('')
-      loadData()
+  const copyJoinCode = async () => {
+    if (barn?.join_code) {
+      await navigator.clipboard.writeText(barn.join_code)
+      setCopiedCode(true)
+      setTimeout(() => setCopiedCode(false), 2000)
     }
   }
 
-  const copyInviteLink = async (invite: BarnInvite) => {
-    const link = `${window.location.origin}/invite/${invite.token}`
-    await navigator.clipboard.writeText(link)
-    setCopiedInvite(invite.id)
-    setTimeout(() => setCopiedInvite(null), 2000)
-  }
-
-  const cancelInvite = async (id: string) => {
-    await supabase.from('barn_invites').delete().eq('id', id)
-    loadData()
+  const regenerateCode = async () => {
+    if (!confirm('Generate a new join code? The old code will stop working.')) return
+    
+    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+    const { error } = await supabase
+      .from('barns')
+      .update({ join_code: newCode })
+      .eq('id', params.barnId)
+    
+    if (!error) loadData()
   }
 
   const updateMemberRole = async (memberId: string, newRole: string) => {
@@ -283,72 +254,47 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
         </div>
       </div>
 
-      {/* Invite Members */}
+      {/* Invite Members - Join Code */}
       {canManage && (
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 bg-stable-100 rounded-lg">
-              <Mail size={20} className="text-stable-600" />
+              <Share2 size={20} className="text-stable-600" />
             </div>
             <h2 className="text-lg font-semibold text-stable-800">Invite Members</h2>
           </div>
 
-          <div className="flex gap-3 mb-6">
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="Email address"
-              className="flex-1 px-4 py-2 border border-stable-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stable-500"
-            />
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as any)}
-              className="px-4 py-2 border border-stable-200 rounded-lg"
-            >
-              <option value="member">Member</option>
-              <option value="manager">Manager</option>
-              <option value="viewer">Viewer</option>
-            </select>
+          <p className="text-stable-600 mb-4">
+            Share this code with people you want to invite to your barn. They can enter it after creating an account.
+          </p>
+
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 bg-stable-100 rounded-xl p-4 text-center">
+              <span className="text-3xl font-mono font-bold text-stable-800 tracking-widest">
+                {barn?.join_code || '------'}
+              </span>
+            </div>
             <button
-              onClick={handleInvite}
-              disabled={inviting || !inviteEmail}
-              className="px-4 py-2 bg-stable-600 text-white rounded-lg hover:bg-stable-700 disabled:opacity-50"
+              onClick={copyJoinCode}
+              className="p-3 bg-stable-600 text-white rounded-xl hover:bg-stable-700 transition-colors"
+              title="Copy code"
             >
-              {inviting ? 'Sending...' : 'Invite'}
+              {copiedCode ? <Check size={20} /> : <Copy size={20} />}
             </button>
+            {isOwner && (
+              <button
+                onClick={regenerateCode}
+                className="p-3 bg-stable-200 text-stable-600 rounded-xl hover:bg-stable-300 transition-colors"
+                title="Generate new code"
+              >
+                <RefreshCw size={20} />
+              </button>
+            )}
           </div>
 
-          {invites.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-stable-600 mb-3">Pending Invites</h3>
-              <div className="space-y-2">
-                {invites.map((invite) => (
-                  <div key={invite.id} className="flex items-center justify-between p-3 bg-stable-50 rounded-lg">
-                    <div>
-                      <p className="text-stable-800">{invite.email}</p>
-                      <p className="text-sm text-stable-500 capitalize">{invite.role}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => copyInviteLink(invite)}
-                        className="p-2 text-stable-400 hover:text-stable-600"
-                        title="Copy invite link"
-                      >
-                        {copiedInvite === invite.id ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-                      </button>
-                      <button
-                        onClick={() => cancelInvite(invite.id)}
-                        className="p-2 text-stable-400 hover:text-red-500"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <p className="text-sm text-stable-500">
+            New members will join as <strong>Members</strong> by default. You can change their role below after they join.
+          </p>
         </div>
       )}
 
