@@ -20,7 +20,7 @@ export default async function DashboardLayout({
     .select('*, barn:barns(*)')
     .eq('user_id', user.id)
 
-  const barns = memberships?.map(m => m.barn) || []
+  const barns = memberships?.map(m => m.barn).filter(Boolean) || []
 
   return (
     <div className="min-h-screen bg-stable-50">
