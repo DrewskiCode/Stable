@@ -65,22 +65,43 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
   // Load profiles for the barn members
   useEffect(() => {
     const loadProfiles = async () => {
-      const { data } = await supabase
+      // First get all barn member user IDs
+      const { data: members, error: membersError } = await supabase
         .from('barn_members')
-        .select('user_id, profile:profiles(*)')
+        .select('user_id')
         .eq('barn_id', barnId)
       
-      if (data) {
+      if (membersError) {
+        console.error('Error loading members:', membersError)
+        return
+      }
+      
+      if (!members || members.length === 0) {
+        console.log('No members found for barn')
+        return
+      }
+      
+      // Get the user IDs
+      const userIds = members.map(m => m.user_id).filter(Boolean)
+      console.log('Loading profiles for user IDs:', userIds)
+      
+      // Now fetch profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds)
+      
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError)
+        return
+      }
+      
+      if (profilesData) {
         const profileMap: Record<string, Profile> = {}
-        data.forEach(member => {
-          if (member.profile && member.user_id) {
-            // Handle case where profile might be an array
-            const profileObj = Array.isArray(member.profile) ? member.profile[0] : member.profile
-            if (profileObj) {
-              profileMap[member.user_id] = profileObj as Profile
-            }
-          }
+        profilesData.forEach(profile => {
+          profileMap[profile.id] = profile
         })
+        console.log('Loaded profiles:', profileMap)
         setProfiles(profileMap)
       }
     }
@@ -184,17 +205,18 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
     
     const updates: Partial<Task> = { status: newStatus }
     
     if (newStatus === 'in_progress') {
       updates.in_progress_at = new Date().toISOString()
-      updates.in_progress_by = user?.id
+      updates.in_progress_by = user.id
       updates.completed_at = null
       updates.completed_by = null
     } else if (newStatus === 'done') {
       updates.completed_at = new Date().toISOString()
-      updates.completed_by = user?.id
+      updates.completed_by = user.id
     } else {
       // Reset to todo
       updates.in_progress_at = null
@@ -203,17 +225,38 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
       updates.completed_by = null
     }
 
-    await supabase
+    // Optimistically update local state immediately
+    setTasks(prev => prev.map(t => 
+      t.id === taskId ? { ...t, ...updates } : t
+    ))
+
+    // Then update the database
+    const { error } = await supabase
       .from('tasks')
       .update(updates)
       .eq('id', taskId)
+    
+    if (error) {
+      console.error('Error updating task:', error)
+      // Revert on error by reloading
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('barn_id', barnId)
+        .order('created_at', { ascending: false })
+      if (data) setTasks(data)
+    }
   }
 
   // Helper to get display name
-  const getDisplayName = (userId: string | null) => {
+  const getDisplayName = (userId: string | null | undefined) => {
     if (!userId) return null
     const profile = profiles[userId]
-    return profile?.display_name || profile?.email?.split('@')[0] || 'Unknown'
+    if (!profile) {
+      console.log('No profile found for userId:', userId, 'Available profiles:', Object.keys(profiles))
+      return 'Team member'
+    }
+    return profile.display_name || profile.email?.split('@')[0] || 'Team member'
   }
 
   // Delete confirmation state
