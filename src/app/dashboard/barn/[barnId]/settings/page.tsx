@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { Barn, BarnMember, Profile } from '@/lib/types'
-import { Settings, Users, Share2, Trash2, LogOut, Crown, UserCog, User, Eye, Copy, Check, RefreshCw } from 'lucide-react'
+import { Settings, Users, Share2, Trash2, LogOut, Crown, UserCog, User, Eye, Copy, Check, RefreshCw, Shield, CheckCircle, XCircle } from 'lucide-react'
 
 export default function SettingsPage({ params }: { params: { barnId: string } }) {
   const [barn, setBarn] = useState<Barn | null>(null)
@@ -149,6 +149,71 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
     viewer: Eye,
   }
 
+  const roleColors = {
+    owner: 'text-amber-600 bg-amber-50 border-amber-200',
+    manager: 'text-purple-600 bg-purple-50 border-purple-200',
+    member: 'text-blue-600 bg-blue-50 border-blue-200',
+    viewer: 'text-stable-600 bg-stable-50 border-stable-200',
+  }
+
+  const roleDescriptions = {
+    owner: 'Full control over the barn',
+    manager: 'Can manage most barn features',
+    member: 'Can complete chores and view info',
+    viewer: 'Can only view barn information',
+  }
+
+  const permissions = {
+    owner: {
+      'View barn & chores': true,
+      'Mark chores complete': true,
+      'Create & edit chores': true,
+      'Delete chores': true,
+      'Add & edit animals': true,
+      'Manage calendar events': true,
+      'Invite new members': true,
+      'Change member roles': true,
+      'Edit barn settings': true,
+      'Delete barn': true,
+    },
+    manager: {
+      'View barn & chores': true,
+      'Mark chores complete': true,
+      'Create & edit chores': true,
+      'Delete chores': true,
+      'Add & edit animals': true,
+      'Manage calendar events': true,
+      'Invite new members': true,
+      'Change member roles': false,
+      'Edit barn settings': false,
+      'Delete barn': false,
+    },
+    member: {
+      'View barn & chores': true,
+      'Mark chores complete': true,
+      'Create & edit chores': true,
+      'Delete chores': false,
+      'Add & edit animals': true,
+      'Manage calendar events': true,
+      'Invite new members': false,
+      'Change member roles': false,
+      'Edit barn settings': false,
+      'Delete barn': false,
+    },
+    viewer: {
+      'View barn & chores': true,
+      'Mark chores complete': false,
+      'Create & edit chores': false,
+      'Delete chores': false,
+      'Add & edit animals': false,
+      'Manage calendar events': false,
+      'Invite new members': false,
+      'Change member roles': false,
+      'Edit barn settings': false,
+      'Delete barn': false,
+    },
+  }
+
   const isOwner = currentUserRole === 'owner'
   const canManage = isOwner || currentUserRole === 'manager'
 
@@ -165,6 +230,52 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-stable-800">Settings</h1>
         <p className="text-stable-500">Manage your barn</p>
+      </div>
+
+      {/* Your Role */}
+      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-stable-100 rounded-lg">
+            <Shield size={20} className="text-stable-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-stable-800">Your Role</h2>
+        </div>
+
+        {(() => {
+          const RoleIcon = roleIcons[currentUserRole as keyof typeof roleIcons] || User
+          const roleColor = roleColors[currentUserRole as keyof typeof roleColors] || roleColors.member
+          const rolePerms = permissions[currentUserRole as keyof typeof permissions] || permissions.member
+          
+          return (
+            <div>
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${roleColor} mb-4`}>
+                <RoleIcon size={20} />
+                <span className="font-semibold capitalize text-lg">{currentUserRole}</span>
+              </div>
+              <p className="text-stable-600 mb-4">
+                {roleDescriptions[currentUserRole as keyof typeof roleDescriptions]}
+              </p>
+              
+              <div className="bg-stable-50 rounded-xl p-4">
+                <h4 className="font-medium text-stable-700 mb-3">Your Permissions</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Object.entries(rolePerms).map(([permission, allowed]) => (
+                    <div key={permission} className="flex items-center gap-2 text-sm">
+                      {allowed ? (
+                        <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
+                      ) : (
+                        <XCircle size={16} className="text-stable-300 flex-shrink-0" />
+                      )}
+                      <span className={allowed ? 'text-stable-700' : 'text-stable-400'}>
+                        {permission}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Barn Details */}
@@ -215,57 +326,99 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
           <div className="p-2 bg-stable-100 rounded-lg">
             <Users size={20} className="text-stable-600" />
           </div>
-          <h2 className="text-lg font-semibold text-stable-800">Team Members</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-stable-800">Team Members</h2>
+            <p className="text-sm text-stable-500">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
+
+        {isOwner && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+            <p className="text-amber-800 text-sm">
+              <Crown size={14} className="inline mr-1" />
+              As the owner, you can change roles by clicking the dropdown next to each member.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-3">
           {members.map((member) => {
             const RoleIcon = roleIcons[member.role as keyof typeof roleIcons] || User
-            const isCurrentUser = member.user_id === barn?.created_by
+            const roleColor = roleColors[member.role as keyof typeof roleColors] || roleColors.member
+            const isThisOwner = member.role === 'owner'
 
             return (
-              <div key={member.id} className="flex items-center justify-between p-3 bg-stable-50 rounded-xl">
+              <div key={member.id} className="flex items-center justify-between p-4 bg-stable-50 rounded-xl hover:bg-stable-100 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-stable-200 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-12 bg-stable-200 rounded-full flex items-center justify-center overflow-hidden">
                     {member.profile?.avatar_url ? (
-                      <img src={member.profile.avatar_url} className="w-10 h-10 rounded-full" />
+                      <img src={member.profile.avatar_url} className="w-12 h-12 rounded-full object-cover" alt="" />
                     ) : (
-                      <User size={20} className="text-stable-500" />
+                      <User size={24} className="text-stable-500" />
                     )}
                   </div>
                   <div>
                     <p className="font-medium text-stable-800">
                       {member.profile?.display_name || member.profile?.email || 'Unknown User'}
                     </p>
-                    <div className="flex items-center gap-1 text-sm text-stable-500">
-                      <RoleIcon size={14} />
+                    <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${roleColor}`}>
+                      <RoleIcon size={12} />
                       <span className="capitalize">{member.role}</span>
                     </div>
                   </div>
                 </div>
 
-                {isOwner && member.role !== 'owner' && (
+                {isOwner && !isThisOwner && (
                   <div className="flex items-center gap-2">
                     <select
                       value={member.role}
                       onChange={(e) => updateMemberRole(member.id, e.target.value)}
-                      className="px-2 py-1 text-sm border rounded-lg"
+                      className="px-3 py-2 text-sm border border-stable-200 rounded-lg bg-white hover:border-stable-300 focus:outline-none focus:ring-2 focus:ring-stable-500"
                     >
-                      <option value="manager">Manager</option>
-                      <option value="member">Member</option>
-                      <option value="viewer">Viewer</option>
+                      <option value="manager">👔 Manager</option>
+                      <option value="member">👤 Member</option>
+                      <option value="viewer">👁️ Viewer</option>
                     </select>
                     <button
                       onClick={() => removeMember(member.id)}
-                      className="p-1 text-stable-400 hover:text-red-500"
+                      className="p-2 text-stable-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Remove member"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={18} />
                     </button>
                   </div>
+                )}
+
+                {isThisOwner && (
+                  <span className="text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                    Barn Owner
+                  </span>
                 )}
               </div>
             )
           })}
+        </div>
+
+        {/* Role Legend */}
+        <div className="mt-6 pt-6 border-t border-stable-200">
+          <h4 className="text-sm font-medium text-stable-700 mb-3">Role Permissions</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {Object.entries(roleDescriptions).map(([role, description]) => {
+              const RIcon = roleIcons[role as keyof typeof roleIcons]
+              const rColor = roleColors[role as keyof typeof roleColors]
+              return (
+                <div key={role} className="flex items-start gap-2 text-sm">
+                  <div className={`p-1 rounded ${rColor}`}>
+                    <RIcon size={14} />
+                  </div>
+                  <div>
+                    <span className="font-medium capitalize text-stable-700">{role}</span>
+                    <p className="text-stable-500 text-xs">{description}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 

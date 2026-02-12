@@ -51,6 +51,8 @@ export interface Task {
   due_time: string | null
   status: TaskStatus
   assigned_to: string | null
+  in_progress_by: string | null
+  in_progress_at: string | null
   completed_at: string | null
   completed_by: string | null
   sort_order: number
@@ -58,6 +60,8 @@ export interface Task {
   created_at: string
   updated_at: string
   assigned_profile?: Profile
+  in_progress_profile?: Profile
+  completed_profile?: Profile
 }
 
 export interface Event {
