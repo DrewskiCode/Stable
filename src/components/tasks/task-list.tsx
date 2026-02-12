@@ -74,7 +74,11 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
         const profileMap: Record<string, Profile> = {}
         data.forEach(member => {
           if (member.profile && member.user_id) {
-            profileMap[member.user_id] = member.profile as Profile
+            // Handle case where profile might be an array
+            const profileObj = Array.isArray(member.profile) ? member.profile[0] : member.profile
+            if (profileObj) {
+              profileMap[member.user_id] = profileObj as Profile
+            }
           }
         })
         setProfiles(profileMap)
