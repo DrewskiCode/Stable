@@ -42,15 +42,30 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
     }
 
     // Load members with profiles
-    const { data: membersData } = await supabase
+    const { data: membersData, error: membersError } = await supabase
       .from('barn_members')
       .select('*, profile:profiles(*)')
       .eq('barn_id', params.barnId)
 
+    console.log('Members data:', membersData, 'Error:', membersError, 'User ID:', user.id)
+
     if (membersData) {
       setMembers(membersData)
       const currentMember = membersData.find(m => m.user_id === user.id)
-      if (currentMember) setCurrentUserRole(currentMember.role)
+      console.log('Current member found:', currentMember)
+      if (currentMember) {
+        setCurrentUserRole(currentMember.role)
+      } else {
+        // Fallback: if user created the barn, they're the owner
+        if (barnData && barnData.created_by === user.id) {
+          setCurrentUserRole('owner')
+        }
+      }
+    } else {
+      // No members data, fallback for owner
+      if (barnData && barnData.created_by === user.id) {
+        setCurrentUserRole('owner')
+      }
     }
 
     setLoading(false)
