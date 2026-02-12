@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { TaskList } from '@/components/tasks/task-list'
 
+export const dynamic = 'force-dynamic'
+
 export default async function BarnChoresPage({ params }: { params: { barnId: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -11,25 +13,33 @@ export default async function BarnChoresPage({ params }: { params: { barnId: str
   }
 
   // Verify user is a member of this barn
-  const { data: membership } = await supabase
+  const { data: membership, error: memberError } = await supabase
     .from('barn_members')
     .select('*, barn:barns(*)')
     .eq('barn_id', params.barnId)
     .eq('user_id', user.id)
     .single()
 
+  if (memberError) {
+    console.error('Membership error:', memberError)
+  }
+
   if (!membership) {
     notFound()
   }
 
-  // Get today's tasks
-  const today = new Date().toISOString().split('T')[0]
-  const { data: tasks } = await supabase
+  // Get tasks - simplified query without the problematic join
+  const { data: tasks, error: tasksError } = await supabase
     .from('tasks')
-    .select('*, assigned_profile:profiles!tasks_assigned_to_fkey(*)')
+    .select('*')
     .eq('barn_id', params.barnId)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
+
+  if (tasksError) {
+    console.error('Tasks error:', tasksError)
+  }
+
+  console.log('Loaded tasks:', tasks?.length, 'for barn:', params.barnId)
 
   return (
     <div className="p-6">

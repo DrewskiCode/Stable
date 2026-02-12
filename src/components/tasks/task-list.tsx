@@ -23,6 +23,7 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [showNewTask, setShowNewTask] = useState(false)
   const [animals, setAnimals] = useState<Animal[]>([])
+  const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
   // New task form state
@@ -38,6 +39,27 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
 
   const canEdit = userRole !== 'viewer'
   const canDelete = userRole === 'owner' || userRole === 'manager'
+
+  // Load tasks on mount (fallback if server didn't load them)
+  useEffect(() => {
+    const loadTasks = async () => {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('barn_id', barnId)
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('Error loading tasks:', error)
+      } else if (data) {
+        console.log('Client loaded tasks:', data.length)
+        setTasks(data)
+      }
+      setLoading(false)
+    }
+    loadTasks()
+  }, [barnId])
 
   // Load animals for assignment
   useEffect(() => {
@@ -63,7 +85,12 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
         filter: `barn_id=eq.${barnId}`,
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setTasks(prev => [...prev, payload.new as Task])
+          // Check if task already exists to avoid duplicates
+          setTasks(prev => {
+            const exists = prev.some(t => t.id === payload.new.id)
+            if (exists) return prev
+            return [...prev, payload.new as Task]
+          })
         } else if (payload.eventType === 'UPDATE') {
           setTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new as Task : t))
         } else if (payload.eventType === 'DELETE') {
