@@ -24,6 +24,26 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
     loadData()
   }, [params.barnId])
 
+  // Real-time subscription for member updates
+  useEffect(() => {
+    const channel = supabase
+      .channel(`barn-members-${params.barnId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'barn_members',
+        filter: `barn_id=eq.${params.barnId}`,
+      }, () => {
+        // Reload data when members change
+        loadData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [params.barnId])
+
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
