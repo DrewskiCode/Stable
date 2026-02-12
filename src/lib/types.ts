@@ -50,6 +50,7 @@ export interface Task {
   due_date: string | null
   due_time: string | null
   status: TaskStatus
+  repeat_type: 'none' | 'daily' | 'weekly' | 'monthly' | null
   assigned_to: string | null
   in_progress_by: string | null
   in_progress_at: string | null

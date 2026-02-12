@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Task, TaskStatus, BarnRole, Animal, Profile } from '@/lib/types'
-import { Plus, Check, Clock, Circle, Trash2, X, Calendar, Repeat, PawPrint, User } from 'lucide-react'
+import { Plus, Check, Clock, Circle, Trash2, X, Calendar, Repeat, PawPrint, User, Undo2 } from 'lucide-react'
 
 interface TaskListProps {
   barnId: string
@@ -41,6 +41,60 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
   const canEdit = userRole !== 'viewer'
   const canDelete = userRole === 'owner' || userRole === 'manager'
 
+  // Helper to check if a recurring task should reset
+  const shouldResetTask = (task: Task): boolean => {
+    if (!task.completed_at || task.status !== 'done') return false
+    if (!task.repeat_type || task.repeat_type === 'none') return false
+
+    const completedAt = new Date(task.completed_at)
+    const now = new Date()
+
+    switch (task.repeat_type) {
+      case 'daily':
+        // Reset if completed on a previous day
+        return completedAt.toDateString() !== now.toDateString()
+      case 'weekly':
+        // Reset if more than 7 days have passed
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        return completedAt < weekAgo
+      case 'monthly':
+        // Reset if it's a new month or more than 30 days
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        return completedAt < monthAgo
+      default:
+        return false
+    }
+  }
+
+  // Reset recurring tasks that need it
+  const resetRecurringTasks = async (tasksToCheck: Task[]) => {
+    const tasksToReset = tasksToCheck.filter(shouldResetTask)
+    
+    if (tasksToReset.length === 0) return tasksToCheck
+
+    console.log(`Resetting ${tasksToReset.length} recurring tasks`)
+
+    for (const task of tasksToReset) {
+      await supabase
+        .from('tasks')
+        .update({
+          status: 'todo',
+          completed_at: null,
+          completed_by: null,
+          in_progress_at: null,
+          in_progress_by: null,
+        })
+        .eq('id', task.id)
+    }
+
+    // Return updated tasks
+    return tasksToCheck.map(task => 
+      tasksToReset.find(t => t.id === task.id)
+        ? { ...task, status: 'todo' as const, completed_at: null, completed_by: null, in_progress_at: null, in_progress_by: null }
+        : task
+    )
+  }
+
   // Load tasks on mount (fallback if server didn't load them)
   useEffect(() => {
     const loadTasks = async () => {
@@ -55,7 +109,9 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
         console.error('Error loading tasks:', error)
       } else if (data) {
         console.log('Client loaded tasks:', data.length)
-        setTasks(data)
+        // Check and reset any recurring tasks that need it
+        const updatedTasks = await resetRecurringTasks(data)
+        setTasks(updatedTasks)
       }
       setLoading(false)
     }
@@ -190,6 +246,7 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
         due_date: newTask.dueDate || null,
         due_time: newTask.dueTime || null,
         section: newTask.section || null,
+        repeat_type: newTask.repeat !== 'none' ? newTask.repeat : null,
         status: 'todo',
         created_by: user.id,
       })
@@ -608,14 +665,29 @@ export function TaskList({ barnId, initialTasks, userRole }: TaskListProps) {
                         </div>
                       )}
                     </div>
-                    {canDelete && (
-                      <button
-                        onClick={() => confirmDelete(task.id, task.title)}
-                        className="text-stable-300 hover:text-red-500 transition-all duration-200 hover:scale-110"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {/* Undo button - only show for in_progress and done tasks */}
+                      {canEdit && status !== 'todo' && (
+                        <button
+                          onClick={() => {
+                            const prevStatus: TaskStatus = status === 'done' ? 'in_progress' : 'todo'
+                            updateTaskStatus(task.id, prevStatus)
+                          }}
+                          className="text-stable-300 hover:text-stable-600 transition-all duration-200 hover:scale-110"
+                          title={status === 'done' ? 'Move back to In Progress' : 'Move back to To Do'}
+                        >
+                          <Undo2 size={16} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => confirmDelete(task.id, task.title)}
+                          className="text-stable-300 hover:text-red-500 transition-all duration-200 hover:scale-110"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
