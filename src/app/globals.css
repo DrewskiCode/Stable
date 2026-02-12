@@ -10,12 +10,35 @@
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-    to bottom,
-    rgb(var(--background-start-rgb)),
-    rgb(var(--background-end-rgb))
-  );
+  background: 
+    radial-gradient(ellipse at 20% 20%, rgba(180, 140, 100, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(139, 90, 43, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 0%, rgba(210, 180, 140, 0.1) 0%, transparent 40%),
+    linear-gradient(
+      180deg,
+      rgb(var(--background-start-rgb)) 0%,
+      rgb(var(--background-end-rgb)) 100%
+    );
   min-height: 100vh;
+}
+
+/* Western style title */
+.font-western {
+  font-family: var(--font-playfair), Georgia, serif;
+  letter-spacing: 0.02em;
+}
+
+/* Subtle texture overlay */
+.texture-overlay {
+  position: relative;
+}
+.texture-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.015;
+  pointer-events: none;
 }
 
 @layer utilities {
