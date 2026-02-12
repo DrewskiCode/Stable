@@ -31,19 +31,20 @@ export default function SignupPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
     })
 
     if (error) {
       setError(error.message)
       setLoading(false)
+    } else if (data.user) {
+      // With email confirmation disabled, user is logged in immediately
+      router.push('/dashboard')
+      router.refresh()
     } else {
-      setMessage('Check your email to confirm your account!')
+      setError('Something went wrong. Please try again.')
       setLoading(false)
     }
   }
