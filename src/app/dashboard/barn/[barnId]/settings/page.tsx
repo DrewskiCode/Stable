@@ -61,31 +61,36 @@ export default function SettingsPage({ params }: { params: { barnId: string } })
       setBarnDescription(barnData.description || '')
     }
 
-    // Load members with profiles
+    // Load members with profiles - use separate query to avoid join issues
     const { data: membersData, error: membersError } = await supabase
       .from('barn_members')
-      .select('*, profile:profiles(*)')
+      .select('*')
       .eq('barn_id', params.barnId)
 
-    console.log('Members data:', membersData, 'Error:', membersError, 'User ID:', user.id)
+    console.log('Members data:', membersData, 'Error:', membersError)
 
-    if (membersData) {
-      setMembers(membersData)
-      const currentMember = membersData.find(m => m.user_id === user.id)
+    if (membersData && membersData.length > 0) {
+      // Get profiles for all members
+      const userIds = membersData.map(m => m.user_id).filter(Boolean)
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds)
+
+      // Merge profiles into members
+      const membersWithProfiles = membersData.map(member => ({
+        ...member,
+        profile: profilesData?.find(p => p.id === member.user_id) || null
+      }))
+
+      setMembers(membersWithProfiles)
+      const currentMember = membersWithProfiles.find(m => m.user_id === user.id)
       console.log('Current member found:', currentMember)
       if (currentMember) {
         setCurrentUserRole(currentMember.role)
-      } else {
-        // Fallback: if user created the barn, they're the owner
-        if (barnData && barnData.created_by === user.id) {
-          setCurrentUserRole('owner')
-        }
       }
     } else {
-      // No members data, fallback for owner
-      if (barnData && barnData.created_by === user.id) {
-        setCurrentUserRole('owner')
-      }
+      setMembers([])
     }
 
     setLoading(false)
