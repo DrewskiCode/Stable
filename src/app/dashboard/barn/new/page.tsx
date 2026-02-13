@@ -28,7 +28,7 @@ export default function NewBarnPage() {
     // Generate a random 6-character join code
     const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase()
 
-    const { data, error } = await supabase
+    const { data, error: barnError } = await supabase
       .from('barns')
       .insert({
         name,
@@ -39,13 +39,28 @@ export default function NewBarnPage() {
       .select()
       .single()
 
-    if (error) {
-      setError(error.message)
+    if (barnError) {
+      setError(barnError.message)
       setLoading(false)
-    } else {
-      router.push(`/dashboard/barn/${data.id}`)
-      router.refresh()
+      return
     }
+
+    // Add the creator as an owner in barn_members
+    const { error: memberError } = await supabase
+      .from('barn_members')
+      .insert({
+        barn_id: data.id,
+        user_id: user.id,
+        role: 'owner',
+      })
+
+    if (memberError) {
+      console.error('Error adding owner to barn:', memberError)
+      // Still navigate since barn was created
+    }
+
+    router.push(`/dashboard/barn/${data.id}`)
+    router.refresh()
   }
 
   return (
