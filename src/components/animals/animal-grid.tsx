@@ -15,6 +15,7 @@ interface AnimalGridProps {
 
 const animalEmojis: Record<string, string> = {
   horse: '🐴',
+  donkey: '🫏',
   cat: '🐱',
   dog: '🐕',
   cow: '🐄',
@@ -108,6 +109,7 @@ export function AnimalGrid({ barnId, initialAnimals, userRole }: AnimalGridProps
                   className="w-full px-4 py-3 border border-stable-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-stable-500"
                 >
                   <option value="horse">🐴 Horse</option>
+                  <option value="donkey">🫏 Donkey</option>
                   <option value="cat">🐱 Cat</option>
                   <option value="dog">🐕 Dog</option>
                   <option value="cow">🐄 Cow</option>
